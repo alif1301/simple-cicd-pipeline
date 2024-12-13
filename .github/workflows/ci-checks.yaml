@@ -1,0 +1,91 @@
+name: CI/CD Pipeline
+
+on: 
+  push:
+    branches:
+      - main  # Trigger on push to the main branch
+
+jobs:
+  # Job to run your build and tests
+  build:
+    runs-on: ubuntu-latest  # You can use 'ubuntu-latest' for a Linux environment
+ snyk-code-vulnerability-scanning:
+    runs-on: ubuntu-latest
+    needs: [terraform-checks, code-ql-scanning]
+    defaults:
+      run:
+        working-directory: files
+    outputs:
+      status: ${{ job.status }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4.1.5
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Run Snyk to check for vulnerabilities
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: | 
+          snyk code test --severity-threshold=high
+          snyk code test --severity-threshold=high --json > snyk_code_results.json
+
+      - name: Upload Snyk Scan Results
+        uses: actions/upload-artifact@v4.3.0
+        with:
+          name: snyk-scan-results
+          path: snyk_code_results.json
+
+  snyk-lib-vulnerability-scanning:
+    runs-on: ubuntu-latest
+    needs: [terraform-checks, code-ql-scanning]
+    defaults:
+      run:
+        working-directory: files
+    outputs:
+      status: ${{ job.status }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4.1.5
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Run Snyk to check for vulnerabilities
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: | 
+          snyk test --severity-threshold=high
+          snyk test --severity-threshold=high --json > snyk_lib_results.json
+
+      - name: Upload Snyk Scan Results
+        uses: actions/upload-artifact@v4.3.0
+        with:
+          name: snyk-scan-results
+          path: snyk_lib_results.json
+
+  snyk-iac-vulnerability-scanning:
+    runs-on: ubuntu-latest
+    needs: [terraform-checks, code-ql-scanning]
+    defaults:
+      run:
+        working-directory: terraform
+    outputs:
+      status: ${{ job.status }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4.1.5
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+      - name: Run Snyk Code Scan And Check Snyk Scan Results
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk iac test --severity-threshold=high
+          snyk iac test --severity-threshold=high --json > snyk_iac_report.json
+      - name: Upload Snyk IaC Report
+        uses: actions/upload-artifact@v4.3.0
+        with:
+          name: snyk-iac-report
+          path: snyk_iac_report.json
